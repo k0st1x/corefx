@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Linq;
+using System.Globalization;
 using System.Numerics;
 using System.Collections.Generic;
 
@@ -115,12 +116,6 @@ namespace System.Buffers.Text.Tests
                 // This value will overflow a UInt32 accumulator upon assimilating the 0 in a way such that the wrapped-around value still looks like
                 // it's in the range of an Int32. Unless, of course, the implementation had the foresight to check before assimilating. 
                 yield return new ParserTestData<int>("9999999990", 0, 'D', expectedSuccess: false);
-
-                // "N" format parsing
-                foreach (ParserTestData<int> testData in TestDataForNFormat.ConvertTestDataForNFormat<int>())
-                {
-                    yield return testData;
-                }
             }
         }
 
@@ -218,8 +213,8 @@ namespace System.Buffers.Text.Tests
                     for (int offset = -20; offset <= 0; offset++)
                     {
                         BigInteger bigValue = maxValue + offset;
-                        string textD = bigValue.ToString("D");
-                        string text = bigValue.ToString(format.Symbol.ToString());
+                        string textD = bigValue.ToString("D", CultureInfo.InvariantCulture);
+                        string text = bigValue.ToString(format.Symbol.ToString(), CultureInfo.InvariantCulture);
                         T expectedValue = (T)(Convert.ChangeType(textD, typeof(T)));
                         yield return new ParserTestData<T>(text, expectedValue, format.Symbol, expectedSuccess: true);
                     }
@@ -228,13 +223,13 @@ namespace System.Buffers.Text.Tests
                     for (int offset = 1; offset <= 20; offset++)
                     {
                         BigInteger bigValue = maxValue + offset;
-                        string text = bigValue.ToString(format.Symbol.ToString());
+                        string text = bigValue.ToString(format.Symbol.ToString(), CultureInfo.InvariantCulture);
                         yield return new ParserTestData<T>(text, default, format.Symbol, expectedSuccess: false);
                     }
 
                     {
                         BigInteger bigValue = maxValue * 10;
-                        string text = bigValue.ToString(format.Symbol.ToString());
+                        string text = bigValue.ToString(format.Symbol.ToString(), CultureInfo.InvariantCulture);
                         yield return new ParserTestData<T>(text, default, format.Symbol, expectedSuccess: false);
                     }
 
@@ -244,8 +239,8 @@ namespace System.Buffers.Text.Tests
                         for (int offset = 0; offset <= 20; offset++)
                         {
                             BigInteger bigValue = minValue + offset;
-                            string textD = bigValue.ToString("D");
-                            string text = bigValue.ToString(format.Symbol.ToString());
+                            string textD = bigValue.ToString("D", CultureInfo.InvariantCulture);
+                            string text = bigValue.ToString(format.Symbol.ToString(), CultureInfo.InvariantCulture);
                             T expectedValue = (T)(Convert.ChangeType(textD, typeof(T)));
                             yield return new ParserTestData<T>(text, expectedValue, format.Symbol, expectedSuccess: true);
                         }
@@ -254,15 +249,24 @@ namespace System.Buffers.Text.Tests
                         for (int offset = -20; offset <= -1; offset++)
                         {
                             BigInteger bigValue = minValue + offset;
-                            string text = bigValue.ToString(format.Symbol.ToString());
+                            string text = bigValue.ToString(format.Symbol.ToString(), CultureInfo.InvariantCulture);
                             yield return new ParserTestData<T>(text, default, format.Symbol, expectedSuccess: false);
                         }
 
                         {
                             BigInteger bigValue = minValue * 10;
-                            string text = bigValue.ToString(format.Symbol.ToString());
+                            string text = bigValue.ToString(format.Symbol.ToString(), CultureInfo.InvariantCulture);
                             yield return new ParserTestData<T>(text, default, format.Symbol, expectedSuccess: false);
                         }
+                    }
+                }
+
+                if (format.Symbol == 'N' || format.Symbol == 'n')
+                {
+                    // "N" format parsing
+                    foreach (ParserTestData<T> testData in TestDataForNFormat.ConvertTestDataForNFormat<T>())
+                    {
+                        yield return testData;
                     }
                 }
             }

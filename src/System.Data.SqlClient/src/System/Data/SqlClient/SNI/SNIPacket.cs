@@ -236,11 +236,20 @@ namespace System.Data.SqlClient.SNI
         /// </summary>
         /// <param name="stream">Stream to read from</param>
         /// <param name="callback">Completion callback</param>
-        public void ReadFromStreamAsync(Stream stream, SNIAsyncCallback callback)
+        public void ReadFromStreamAsync(Stream stream, SNIAsyncCallback callback, bool isMars)
         {
             bool error = false;
+            TaskContinuationOptions options = TaskContinuationOptions.DenyChildAttach;
+            // MARS operations during Sync ADO.Net API calls are Sync over Async. Each API call can request 
+            // threads to execute the async reads. MARS operations do not get the threads quickly enough leading to timeout
+            // To fix the MARS thread exhaustion issue LongRunning continuation option is a temporary solution with its own drawbacks, 
+            // and should be removed after evaluating how to fix MARS threading issues efficiently
+            if (isMars)
+            {
+                options |= TaskContinuationOptions.LongRunning;
+            }
 
-            stream.ReadAsync(_data, 0, _capacity).ContinueWith(t =>
+            stream.ReadAsync(_data, 0, _capacity, CancellationToken.None).ContinueWith(t =>
             {
                 Exception e = t.Exception != null ? t.Exception.InnerException : null;
                 if (e != null)
@@ -267,7 +276,7 @@ namespace System.Data.SqlClient.SNI
                 callback(this, error ? TdsEnums.SNI_ERROR : TdsEnums.SNI_SUCCESS);
             },
             CancellationToken.None,
-            TaskContinuationOptions.DenyChildAttach | TaskContinuationOptions.LongRunning,
+            options,
             TaskScheduler.Default);
         }
 
@@ -287,6 +296,25 @@ namespace System.Data.SqlClient.SNI
         public void WriteToStream(Stream stream)
         {
             stream.Write(_data, 0, _length);
+        }
+
+        /// <summary>
+        /// Write data to a stream asynchronously
+        /// </summary>
+        /// <param name="stream">Stream to write to</param>
+        public async void WriteToStreamAsync(Stream stream, SNIAsyncCallback callback, SNIProviders provider)
+        {
+            uint status = TdsEnums.SNI_SUCCESS;
+            try
+            {
+                await stream.WriteAsync(_data, 0, _length, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                SNILoadHandle.SingletonInstance.LastError = new SNIError(provider, SNICommon.InternalExceptionError, e);
+                status = TdsEnums.SNI_ERROR;
+            }
+            callback(this, status);
         }
 
         /// <summary>
